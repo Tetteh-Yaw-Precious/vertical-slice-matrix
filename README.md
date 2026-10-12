@@ -307,9 +307,12 @@ single declaration the rest should derive from.
 ## Related
 
 The ratchet in Mode B (a check that fails if a count goes up, baselined at
-today) is deliberately not specified here. If you want it, pair this with an
-`architecture-guardrails` skill that owns the mechanics of enforced checks. The
-`Done when` clause `guardrail ratcheted` assumes something like it exists.
+today) is deliberately not specified here.
+[architecture-guardrails](https://github.com/Tetteh-Yaw-Precious/architecture-guardrails)
+owns those mechanics: the admission rule, the four enforcement tiers, a
+baseline-ratcheted checker skeleton and the mutation test that proves the checker
+is not silently broken. Mode A's `Done when` clause `guardrail ratcheted` assumes
+it, or something like it, exists.
 
 ## Credits
 
