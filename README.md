@@ -163,6 +163,48 @@ You can also just read `SKILL.md` and apply it by hand. It's prose and tables, n
   knowing they're coming shapes what you build now, and that's free. The moment one becomes a
   ticket, somebody works on it.
 
+## How this sits next to Matt Pocock's `to-tickets`
+
+[`to-tickets`](https://github.com/mattpocock/skills) is the nearest neighbour in the most widely
+installed skill set there is, and it is worth knowing where the two agree, where they genuinely
+disagree, and where it is simply better than this one.
+
+**Shared ground, arrived at separately.** `to-tickets` already insists each ticket cuts "a narrow
+but COMPLETE path through every layer (schema, API, UI, tests): vertical, NOT a horizontal slice of
+one layer", and that "a completed slice is demoable or verifiable on its own". That is the layer
+test and the outside-checkable finish line, in different words. Two people reached the same place,
+which is decent evidence the place is right.
+
+**The real disagreement: what orders the list.** `to-tickets` gives every ticket its blocking
+edges and tells the agent to "work the frontier", meaning any ticket whose blockers are all done.
+This skill demotes dependency deliberately, calling it "rare, and usually less binding than it
+first looks", and sorts by cost of deferral instead.
+
+Both answers are defensible, and they answer different questions. A dependency graph tells you what
+*can* start now. It does not tell you what you will regret not having done first. Those come apart
+exactly where it hurts: how money is represented has no blockers at all, so it sits available on the
+frontier from day one and gets picked up in month four, by which point every feature already built
+has an opinion about it.
+
+**The thing neither of them shares.** `to-tickets` takes a plan and cuts it up. It never asks
+whether a shared capability should exist yet. This skill does, and the answer is the strongest claim
+here: build the shared thing when its **second** user turns up, so two real cases settle its shape
+instead of one guess. There is exactly one exception, the floor, where there is no later. Nothing in
+`to-tickets` contradicts that, so running both is reasonable.
+
+**Where `to-tickets` is better, and this skill has no answer.** Wide refactors. A single mechanical
+change whose blast radius fans across the codebase (rename a column, retype a shared symbol) cannot
+be made into a vertical slice, because one edit breaks thousands of call sites and nothing can land
+green. `to-tickets` handles it properly with expand then contract: add the new form beside the old
+so nothing breaks, migrate the call sites in batches sized by blast radius with each batch its own
+ticket, then delete the old form once no caller remains. The layer test in this skill would simply
+reject "rename the column everywhere" as not a slice and tell you to split it across the slices that
+consume it, which is not an answer for a mechanical rename. Use the expand-contract sequence there.
+
+`to-tickets` also sizes every slice to fit in a single fresh context window, which is a constraint
+about working with an agent rather than about the shape of the work. This skill has nothing to say
+about that, and probably should.
+
 ## Companion skills
 
 | Skill | How it relates |
