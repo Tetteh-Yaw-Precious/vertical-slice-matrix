@@ -1,324 +1,175 @@
-# Vertical Slice Matrix
+# vertical-slice-matrix
 
-A skill that fires at two moments most work gets wrong: when you are about to
-propose a plan, and when you are about to write something the codebase already
-has.
+> **In plain terms:** Two things go wrong when software gets built. You plan the work and end up
+> with a list of "phases" that nobody outside the room can tell are finished. And you build a small
+> piece of code without noticing that the same piece has already been written four times, in four
+> places, that now disagree with each other. This is a checklist an AI assistant follows at exactly
+> those two moments. It is the kitchen-drawer problem: four people each bought their own tin opener,
+> and the recipe is pinned in four places with different ingredients on each copy.
 
-A feature list read **down** gives you features. Read **across**, it gives you
-the handful of capabilities several features share. Those are the slices. The
-same capability built three times is the most expensive thing in a codebase, and
-by the time you can see all three it is too late to merge them cheaply.
+The rest of this page explains both halves, then how to install it. You don't need to already know
+the tools to follow along.
 
-## Why this exists
+## What am I looking at?
 
-Two failures, one skill.
+This is a **skill for AI coding agents** like Claude Code, Cursor, Codex, and Gemini CLI, the tools
+that write code alongside you. A skill is a set of written instructions the agent reads and
+follows. You install it once and don't call it. The agent notices the two moments below and uses
+it.
 
-**Planning produces layers.** Ask for a build order and you get `Phase 1:
-Schema Hardening`, `Phase 2: Safety Infrastructure`, `Phase 3: Cleanup`. Every
-item is honest work. Nothing ships to a user when one completes, nobody outside
-the conversation can tell when one is done, and the plan quietly becomes a
-to-do list with ambitions.
+> **Not to be confused with "vertical slice architecture."** If you came here for the .NET pattern
+> (one folder per feature, MediatR handlers, FluentValidation), that's a different thing that
+> happens to share the words. This cares about which capabilities to build in what order, and about
+> finding the one place a list should be written down. It says nothing about folder layout and works
+> in any language.
 
-**Building produces copies.** You need a date formatter. You write
-`formatRelativeTime`. The existing one is called `timeAgo`, so your grep found
-nothing and now there are two. Repeat for a year. Worse, the thing you
-duplicated was never a formatter at all, it was a *list*: the set of order
-statuses, or payment methods, or permissions. Nobody chose to duplicate that.
-It spread because each new value got typed into whichever files the author had
-open at the time.
+## The story that explains the second half
 
-Those two failures want opposite treatment, which is the part this skill gets
-right and most dedup advice gets wrong. See [behaviour or fact](#first-question-behaviour-or-fact).
+A list of ways a customer could pay had been typed into about fourteen different files across the
+codebase. Nobody chose that. Each time somebody added a payment method, they typed it into whichever
+files they happened to have open.
 
-The sharpest consequence, and the reason Mode B was rewritten: **a stale
-declaration of a list does not just add one more wrong copy, it silently
-switches off every exhaustiveness check downstream of it.** That is how a set of
-order statuses or payment methods can be wrong in a dozen places and still
-compile green. See [the incident](#the-incident-that-rewrote-mode-b).
+One of those fourteen was supposed to be the official one, and it was out of date by a single entry.
+Now, normally a programming language will catch that for you: if the official list has five items
+and a screen only handles five items, and you add a sixth, the language complains. **But the
+official list was the thing that was stale.** Five against five looked perfect. Every check
+downstream went quiet.
 
-> **This is not vertical slice architecture.** If you came here for the .NET
-> pattern (one folder per feature, MediatR handlers, FluentValidation), that is a
-> different thing that shares the words. This skill is about which capabilities
-> to build in what order, and about finding the one declaration a list should
-> derive from. It is stack-agnostic and says nothing about folder layout.
+So gift cards shipped as a way to pay, and the receipt printed `gift_card` at the customer.
 
-## Install
+The lesson isn't "we missed a file". It's that **one out-of-date copy of a list doesn't just add one
+more wrong place. It silently switches off the safety checks everywhere else**, which is how
+something can be wrong in a dozen places and still look completely fine.
 
-This is a skill for [Claude Code](https://claude.com/claude-code) and any
-harness that reads the same format.
+## Half one: before you write a small piece of code
 
-```bash
-# personal scope, active in every project
-git clone https://github.com/Tetteh-Yaw-Precious/vertical-slice-matrix \
-  ~/.claude/skills/vertical-slice-matrix
+The agent asks one question first, because two things that look identical have opposite right
+answers.
 
-# or project scope, checked in and shared with the team
-git clone https://github.com/Tetteh-Yaw-Precious/vertical-slice-matrix \
-  .claude/skills/vertical-slice-matrix
-```
+**Is it behaviour, or is it a fact?**
 
-The only required file is `SKILL.md`. Nothing to configure, no dependencies, no
-language or stack assumptions.
-
-If your project has a `CLAUDE.md`, pointing at the moments is what makes it
-actually fire rather than sit there:
-
-```markdown
-| Moment                                                    | Skill                        |
-| --------------------------------------------------------- | ---------------------------- |
-| About to propose a sequence of work, or asked "what next"  | vertical-slice-matrix (A)    |
-| About to write any helper, formatter, hook or component    | vertical-slice-matrix (B)    |
-| About to add a value to an enum, status set or option list | vertical-slice-matrix (B)    |
-```
-
-You can also read it as a document and apply it by hand. It is prose and tables,
-not code.
-
-## Pick a mode first
-
-| You are | Mode |
-| --- | --- |
-| Holding a wish list, planning what to build and in what order | A |
-| About to write a helper, hook, formatter or component | B |
-| About to add or remove a value in an enum, status set, permission list | B, and its first section before anything else |
-
----
-
-## Mode A: planning a project or milestone
-
-Finding the slices is the easy half. What gets skipped is producing something
-durable, so the rule is blunt: **a plan in prose evaporates, build the board.**
-
-### Finding a slice
-
-1. Write the wants as rows, in the user's words. No solution nouns yet.
-2. Under each want, name the capability it needs as a **verb phrase**. "Decide
-   who is allowed to do this", not "AuthService".
-3. Where the same capability sits under two or more wants, that is a candidate
-   slice. One want only is a feature, not a slice.
-4. Name the slice by its **outcome**. `Slice 3 · See the week`, not
-   `Calendar module`. The test: someone who has never read the codebase can tell
-   you what changed when it ships.
-
-### The layer test
-
-Apply it to every candidate. If the name is a layer or a phase, it is not a
-slice. `Schema Hardening`, `Safety Infrastructure`, `Operational Hardening`,
-`Structural Cleanup`, `Phase 2` are horizontal cuts wearing slice clothing. They
-can be true, useful and worth doing, and they are still not slices, because
-nothing ships to anyone when one completes.
-
-A candidate that fails usually wants to be split across the slices that consume
-it, or demoted to a checklist inside one.
-
-### Every slice has a kind
-
-Tag each piece of work inside a slice. The tag is a claim you can be wrong
-about, which is the point.
-
-| Kind | What it is | Test |
-| --- | --- | --- |
-| **Engine** | the mechanism the slice adds | lives in one place, called from many |
-| **Fold** | what regenerates from the engine | delete it, regenerate, output is identical |
-| **Guardrail** | the ratcheted check | fails the build when the number gets worse |
-| **Surface** | what the user touches | a screenshot shows the change |
-
-A slice that is all Surface is a feature with a big name. A slice with no
-Guardrail will drift back and you will rebuild it. A slice with no Engine is a
-chore list.
-
-Folds are the kind people forget and where the leverage is: read models,
-generated registries, one parametrised test per table row, an exported state
-diagram. Anything you would otherwise hand-maintain in parallel with the engine
-and watch drift.
-
-### Done when
+**Behaviour** is something that could reasonably be written more than one way and none of them are
+wrong: a date formatter, a bit of validation, a button component. Duplicating it costs you
+maintenance and nothing worse. Here the advice is relaxed: one or two copies, leave them alone,
+because two copies is cheaper than the wrong shared abstraction. At four or more you're paying rent
+every month, so your next piece of work folds one of them in, deletes it, and says so in writing:
 
 ```
-Done when: engine exists · folds regenerate · guardrail ratcheted · surface ships
-```
-
-Drop the clauses that do not apply. **Every clause that stays must be checkable
-by someone who was not in the conversation.** Not "implement the command table",
-but "the router refuses at boot to mount a command the table does not declare".
-
-If you cannot write `Done when` for a slice, the slice is not scoped yet. That
-is the finding, not a blocker to work around.
-
-### Order comes from cost of deferral
-
-Slices carry a `used by N` count. It marks what must not drift, the thing worth
-a guardrail. **It is not a sort key.** Do not build most-depended-on first.
-Build a slice when its *second* consumer arrives, so the shape is settled by two
-real cases instead of one guess.
-
-The sort key is one line per slice: what gets worse if this arrives later? Most
-answer "nothing much, it is the same work either way". Those wait.
-
-The slice whose answer is *"retrofitting this across everything already built is
-a different and much worse project"* goes first, even with no visible change.
-Tenancy isolation, audit trails, money representation, tenant-scoped IDs. Call
-it `Slice 0 · The floor`. There is usually exactly one, occasionally none, and
-if you think you have three you have not cut them finely enough. This is the one
-exception to waiting for the second consumer, because on the floor there is no
-later.
-
----
-
-## Mode B: an existing codebase
-
-The trigger is **feature work, not refactor time.** Refactor time never arrives;
-nobody funds a sprint that ships no user-visible change. But every feature makes
-you go looking for where a capability lives anyway. This changes what you do
-with what you find.
-
-> Before writing it, look for it. If it is already there several times, your
-> feature ships on one consolidated version, and one copy is gone.
-
-### First question: behaviour or fact?
-
-Answer this before you count anything. Two different things look identical in a
-grep and have **opposite** correct answers, and getting the routing wrong is
-worse than not looking at all.
-
-**Behaviour** can have several implementations without any of them being wrong:
-a formatter, a hook, a validator, a component. Duplication costs maintenance and
-nothing else.
-
-**A fact** is one truth that many places must agree on: a set of payment
-methods, order statuses, permissions, event types, route names, feature flags,
-error codes.
-
-The test is one question. **If someone adds a member tomorrow, how many files
-have to change for the codebase to still be correct?** One means the fact has a
-home. More than one means it has leaked, and every site that misses the update
-is wrong without saying so.
-
-### Facts: find the leak
-
-**Grep a member, never the name.** The copies of a fact rarely share a name.
-Three sites holding the same list of payment methods were called
-`formatPaymentMethod`, `getPaymentMethodLabel`, and an unnamed object literal
-inline in a component, so any search by name returns one hit and reads as
-conclusive.
-
-```bash
-grep -rn "mobile_money" .          # a member, not the set
-grep -rn "awaiting_approval" .
-```
-
-Members are the one thing every copy must contain, in every language, whatever
-anybody named the wrapper. This is the single highest-yield search in the skill,
-and it works whether or not you use an agent.
-
-Then: the threshold is **one** (two copies of a fact is already broken, just
-waiting for the next value to prove it). Ask what the compiler was supposed to
-catch, and whether it is telling the truth. Make the copies **derive** from the
-declaration closest to the wire format or storage layer. Name the residue that
-genuinely cannot derive (a database CHECK constraint, a framework struct tag, a
-service in another language) and put one narrow test on each.
-
-The deliverable names the source of truth, because for a fact a count is noise.
-`14 → 13` reads as progress while describing a codebase still broken in thirteen
-places.
-
-```
-payment methods: one declaration at api/invoices/model.go
-derived: shared-core types (generated), both binding validators
-residue: payments_payment_method_check, covered by a test
-```
-
-### Behaviour: the threshold
-
-| Copies found | Do |
-| --- | --- |
-| 1 to 2 | Use it, or leave them. Duplication is cheaper than the wrong abstraction. |
-| 3 | Judgement. Consolidate only if they change together. |
-| 4+ | Consolidate one. You are paying rent every sprint. |
-
-Count them all before touching anything, and **search the concept before the
-symbol**: a grep only finds a thing you can already name, and the case that
-hurts is `formatRelativeTime` versus the existing `timeAgo`. Diff the copies,
-because copies that disagree are a live bug and the disagreement tells you which
-behaviour is canonical. Pick one home, migrate the call site your feature
-needed, delete its copy in the same change, leave the rest counted.
-
-Then state the count, explicitly, in the PR body:
-
-```
-formatBytes: 5 → 4
+formatBytes: 5 -> 4
 remaining: ui/FileRow.tsx, admin/UsageTable.tsx, reports/ExportSummary.tsx
 ```
 
-A change that adds a canonical home and moves no number has not consolidated
-anything, it has forked. There are now N+1 implementations and the newest one
-claims to be authoritative, so the next reader trusts it and never learns that
-four screens bypass it. A re-export shim does not count as removal: it keeps the
-old path valid, so nothing forces migration and the number never moves.
+Adding a new "official" version without deleting a copy isn't tidying up, it's making a fifth one
+that claims to be in charge. The next person believes it and never learns that four screens go
+round the back.
 
-### Refuse loudly
+**A fact** is one truth that lots of places have to agree about: the ways you can pay, the states an
+order can be in, who's allowed to do what, the kinds of notification you send. The test is a single
+question: *if somebody adds one more tomorrow, how many files have to change for the code to still
+be right?* One means it has a home. More than one means it's leaked.
 
-Stop and raise it as its own ticket when merging would change behaviour a user
-sees (two copies rendering `45m` and `45 min` cannot be unified without picking
-one, and that is a product decision), when the copies do not change together
-(check the history, files that never move in the same commit are two things that
-happen to rhyme), or when the scope is growing (one consolidation per feature).
+For a fact the relaxed advice is thrown out. Two copies is already broken, it's just waiting for the
+next entry to prove it. And the way to find the copies is the most useful trick in the whole skill:
 
-Say which one, and why. A silent refusal is indistinguishable from not looking.
+```bash
+grep -rn "mobile_money" .          # search for a thing in the list
+```
 
----
+**Search for an item, never the name of the list.** The copies almost never share a name. Three
+places holding the same payment methods were called `formatPaymentMethod`,
+`getPaymentMethodLabel`, and an unnamed lump of text inside a screen. Searching by name finds one of
+them and reads like a definitive answer. Searching for `mobile_money` finds all three, because
+whatever anyone called the wrapper, every copy has to contain the actual items.
 
-## The incident that rewrote Mode B
+## Half two: before you propose a plan
 
-Mode B originally taught the threshold, gradual migration and a stated count for
-everything. That is wrong for facts, and here is the bill.
+A numbered list of work is a build order, and most build orders come out shaped like layers.
 
-A payment-method list was declared about fourteen times across a Go API and a
-TypeScript monorepo. The canonical TypeScript union was stale by one member. The
-label maps were written as `Record<Union, string>`, which is exhaustive, so a
-five-key map checked against a five-member union compiled perfectly clean.
+**The layer test.** If the name of a piece of work is a layer or a phase, it isn't a real piece of
+work. `Schema Hardening`, `Safety Infrastructure`, `Operational Hardening`, `Phase 2`. Each of
+those can be completely honest and worth doing, and they're still wrong as plan items, because
+**nothing reaches anybody when one of them finishes**. There's no moment where you can tell your
+customer something happened.
 
-Gift-card payment shipped. Receipts printed the raw string `gift_card`.
+So name each piece of work by what changes when it lands: `See the week`, not `Calendar module`.
+Someone who has never read the code should be able to tell you what's different afterwards.
 
-The lesson is not "we missed a file". It is that **a stale declaration does not
-just add one more wrong copy, it silently switches off every exhaustiveness
-check downstream of it**, which is how a list can be wrong in a dozen places and
-still go green in CI.
+**Then write the finish line.** Every item gets a "done when" that **someone who wasn't in the
+conversation could check**. Not "implement the command table", which is just the title again, but
+"the app refuses to start if the table is missing an entry". If you can't write that sentence, the
+item isn't understood well enough to be on the list yet. That's a finding, not an obstacle.
 
-The deeper diagnosis, which drove the rewrite: the old Mode B taught *managing*
-duplication, and maintenance thinking cannot produce a source of truth. If the
-answer is a fact, the question is never how many copies there are. It is which
-single declaration the rest should derive from.
+**And order by what gets worse if you wait.** The instinct is to build the most-depended-on thing
+first. The skill says don't: build a shared thing when its *second* user shows up, so its shape is
+settled by two real cases instead of one guess. One line per item answers "what gets worse if this
+arrives later?", and for most of them the honest answer is "nothing, it's the same work either way".
+
+The exception is the thing whose answer is *"retrofitting this across everything we've already built
+is a different and much worse project"*: how money is represented, how customer data is kept apart,
+the record of who did what. That one goes first even though nothing visible changes. There's
+usually exactly one, and if you think you have three you haven't looked closely enough.
+
+## Requirements
+
+- An AI coding agent that supports the Agent Skills standard: Claude Code, Cursor (2.4+), Codex,
+  Gemini CLI, or GitHub Copilot CLI. They all read the same `SKILL.md` format, so one copy works in
+  any of them.
+
+No other dependencies. It's instructions and tables, and it doesn't care what language your project
+is written in.
+
+## Install
+
+| Agent | Where skills live |
+|-------|-------------------|
+| Claude Code | `~/.claude/skills/` (your home folder, used by every project) |
+| Codex | `~/.agents/skills/` |
+| Gemini CLI | `~/.agents/skills/` |
+| GitHub Copilot CLI | `~/.agents/skills/` |
+| Cursor (2.4+) | `.cursor/skills/` **inside the project** you want to use it in |
+
+```bash
+# Claude Code
+git clone https://github.com/Tetteh-Yaw-Precious/vertical-slice-matrix.git \
+  ~/.claude/skills/vertical-slice-matrix
+
+# Codex, Gemini CLI, or Copilot CLI
+git clone https://github.com/Tetteh-Yaw-Precious/vertical-slice-matrix.git \
+  ~/.agents/skills/vertical-slice-matrix
+```
+
+If your project has a `CLAUDE.md` or `AGENTS.md`, naming the moments is what makes it actually fire
+rather than sit there unused:
+
+```markdown
+| Moment                                                     | Skill                     |
+| ---------------------------------------------------------- | ------------------------- |
+| About to propose a sequence of work, or asked "what next"   | vertical-slice-matrix     |
+| About to write any helper, formatter, hook or component     | vertical-slice-matrix     |
+| About to add a value to a fixed list of options             | vertical-slice-matrix     |
+```
+
+You can also just read `SKILL.md` and apply it by hand. It's prose and tables, not code.
 
 ## Honest limits
 
-- **Mode A pays off on greenfield.** On a live product with real users, build
-  order comes from customer feedback and incidents, not from a dependency graph.
-  Use Mode A for a new project or a new milestone, not to re-cut a backlog that
-  is already in flight.
-- **Do not retrofit slices onto an existing issue tracker.** A board nobody
-  reopens is decoration.
-- **The counts are a signal, not arithmetic.** Draw the boxes differently and
-  the numbers change.
-- **`FUTURE` rows never become tickets.** They shape the slices, which is free.
-  The moment one becomes a ticket, someone works it, and you have built
-  speculation.
+- **The planning half is for new work.** On a live product with real customers, the order comes from
+  what they tell you and what broke last week, not from a dependency diagram. Use it for a new
+  project or a new milestone, not to re-cut a backlog that's already moving.
+- **Don't retrofit it onto an existing tracker.** A board nobody reopens is decoration.
+- **The copy counts are a signal, not arithmetic.** Draw the boundaries differently and the numbers
+  change.
+- **Items you're deliberately not building never become tickets.** They're worth listing, because
+  knowing they're coming shapes what you build now, and that's free. The moment one becomes a
+  ticket, somebody works on it.
 
-## Related
+## Companion skills
 
-The ratchet in Mode B (a check that fails if a count goes up, baselined at
-today) is deliberately not specified here.
-[architecture-guardrails](https://github.com/Tetteh-Yaw-Precious/architecture-guardrails)
-owns those mechanics: the admission rule, the four enforcement tiers, a
-baseline-ratcheted checker skeleton and the mutation test that proves the checker
-is not silently broken. Mode A's `Done when` clause `guardrail ratcheted` assumes
-it, or something like it, exists.
-
-## Credits
-
-Written and used in production by [@Tetteh-Yaw-Precious](https://github.com/Tetteh-Yaw-Precious). Mode A's
-vocabulary (Engine, Fold, Guardrail, Surface) and the layer test came out of
-cutting a real roadmap badly first.
+| Skill | How it relates |
+|---|---|
+| [`architecture-guardrails`](https://github.com/Tetteh-Yaw-Precious/architecture-guardrails) | Once you have a count of duplicate copies, that skill is how you stop it getting worse: an automatic check that fails if the number goes up. The "done when" line here assumes something like it exists. |
+| [`feature-cycle`](https://github.com/Tetteh-Yaw-Precious/feature-cycle) | The loop around everything. It calls this skill at the point where it's about to write a small piece of code or add a value to a fixed list. |
+| [`lifecycle-feature`](https://github.com/Tetteh-Yaw-Precious/lifecycle-feature) | A list of statuses is the textbook example of a fact, so check here before adding one, then build it with that. |
 
 ## License
 
