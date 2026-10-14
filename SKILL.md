@@ -309,6 +309,14 @@ Stop and raise it as its own ticket when:
 
 Say which one, and why. A silent refusal is indistinguishable from not looking.
 
+**One carve-out, so this rule does not fire on the moment it was built for.** "The scope is
+growing" is about duplicated *behaviour*, and it does not apply to an **engine whose second
+consumer is the feature you are building right now**. That is the arrival this skill tells you to
+wait for, so generalising a one-case engine as part of its second case is the plan working, not
+scope creep. The test is whether the generalisation would exist without this feature: if it would,
+it is a refactor and it waits; if the feature cannot land correctly without it, it is in scope. Say
+in the PR that the engine went from one case to two.
+
 ### Make it ratchet
 
 Once a count exists, hold it: a check that fails if the number goes up, baselined
